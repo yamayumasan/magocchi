@@ -10,11 +10,22 @@
 
 ## 特徴
 
-- 🎙️ **音声ファースト**: 話しかけるだけで操作完了
-- 🧠 **長期記憶**: ユーザーのことを覚えて、文脈を踏まえた応答
-- 📋 **タスク管理**: 買い物リスト、リマインダー、予定管理
-- 💬 **自然な会話**: 雑談相手としても機能
-- 👴 **高齢者向けUI**: 大きな文字、シンプルな操作
+- **音声ファースト**: 話しかけるだけで操作完了
+- **長期記憶**: ユーザーのことを覚えて、文脈を踏まえた応答
+- **タスク管理**: 買い物リスト、リマインダー、予定管理
+- **自然な会話**: 雑談相手としても機能
+- **高齢者向けUI**: 大きな文字、シンプルな操作
+
+## ドキュメント
+
+| ドキュメント | 内容 |
+|-------------|------|
+| [ビジョン](./docs/00_VISION.md) | ビジョン・将来像・本質的価値 |
+| [コンセプト](./docs/01_CONCEPT.md) | ターゲットユーザー・差別化ポイント |
+| [ロードマップ](./docs/02_ROADMAP.md) | 開発ステップ・マイルストーン |
+| [MVP仕様](./docs/03_MVP_SPEC.md) | MVP機能仕様・UI概要 |
+| [技術スタック](./docs/04_TECH_STACK.md) | 技術選定・アーキテクチャ |
+| [リスク](./docs/05_RISKS.md) | リスク・課題・未決定事項 |
 
 ## 技術スタック
 
@@ -25,27 +36,18 @@
 - PWA対応
 
 ### バックエンド
-- Node.js + Express/Fastify
+- Node.js + Fastify
 - TypeScript
-- PostgreSQL
-- Vector Database (Pinecone/Supabase)
+- PostgreSQL + pgvector (Supabase)
 
 ### AI/音声
-- LLM: Claude API / OpenAI GPT
+- LLM: Claude API
 - 音声認識: Whisper API
 - 音声合成: ElevenLabs / VOICEVOX
 
-## ドキュメント
-
-- [コンセプト](./docs/01_CONCEPT.md)
-- [技術選定](./docs/02_TECH_STACK.md) *(予定)*
-- [システム設計](./docs/03_ARCHITECTURE.md) *(予定)*
-- [データベース設計](./docs/04_DATABASE.md) *(予定)*
-- [API設計](./docs/05_API.md) *(予定)*
-
 ## 開発ステータス
 
-🚧 **企画・設計フェーズ**
+**Phase 0: PoC（技術検証）** - これから開始
 
 ## ライセンス
 
