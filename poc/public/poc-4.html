@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PoC-4: E2E統合 - 孫っち</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+    .container {
+      max-width: 500px;
+      width: 100%;
+      background: white;
+      border-radius: 24px;
+      padding: 32px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    .nav {
+      margin-bottom: 20px;
+    }
+    .nav a {
+      margin: 0 10px;
+      color: #1976D2;
+      text-decoration: none;
+    }
+    .nav a:hover {
+      text-decoration: underline;
+    }
+    .chat-area {
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: #fafafa;
+      border-radius: 16px;
+    }
+    .message {
+      margin-bottom: 16px;
+    }
+    .message.user {
+      text-align: right;
+    }
+    .message-bubble {
+      display: inline-block;
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+    .message.user .message-bubble {
+      background: #4CAF50;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant .message-bubble {
+      background: white;
+      border: 2px solid #e0e0e0;
+      border-bottom-left-radius: 4px;
+    }
+    .message-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .btn-talk {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(145deg, #4CAF50, #388E3C);
+      color: white;
+      font-size: 48px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
+      transition: all 0.2s;
+    }
+    .btn-talk:hover {
+      transform: scale(1.05);
+    }
+    .btn-talk:active {
+      transform: scale(0.95);
+    }
+    .btn-talk.recording {
+      background: linear-gradient(145deg, #f44336, #d32f2f);
+      box-shadow: 0 4px 16px rgba(244, 67, 54, 0.4);
+      animation: pulse 1s infinite;
+    }
+    .btn-talk.processing {
+      background: linear-gradient(145deg, #FF9800, #F57C00);
+      box-shadow: 0 4px 16px rgba(255, 152, 0, 0.4);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 4px 16px rgba(244, 67, 54, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 4px 24px rgba(244, 67, 54, 0.6); }
+    }
+    .status {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 16px;
+      color: #666;
+      min-height: 24px;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #eee;
+    }
+    .metric {
+      text-align: center;
+      padding: 8px;
+    }
+    .metric-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+    }
+    .tts-select {
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .tts-select label {
+      margin-right: 16px;
+      cursor: pointer;
+    }
+    .tts-select input {
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>PoC-4: エンドツーエンド統合</h1>
+  <p class="subtitle">音声入力 → LLM → 音声出力 の一連のフロー</p>
+
+  <nav class="nav">
+    <a href="/poc-2.html">← PoC-2: LLM</a>
+    <a href="/">ホーム</a>
+  </nav>
+
+  <div class="container">
+    <div class="tts-select">
+      <label>
+        <input type="radio" name="tts" value="browser" checked>
+        ブラウザTTS
+      </label>
+      <label>
+        <input type="radio" name="tts" value="elevenlabs">
+        ElevenLabs
+      </label>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <div class="message assistant">
+        <div class="message-label">孫っち</div>
+        <div class="message-bubble">
+          ボタンを押して話しかけてください
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-talk" id="talkBtn" onclick="toggleTalk()">
+      🎤
+    </button>
+
+    <div class="status" id="status">タップして話す</div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value" id="sttTime">-</div>
+        <div class="metric-label">音声認識</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="llmTime">-</div>
+        <div class="metric-label">LLM応答</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="totalTime">-</div>
+        <div class="metric-label">合計時間</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isProcessing = false;
+
+    const talkBtn = document.getElementById('talkBtn');
+    const status = document.getElementById('status');
+    const chatArea = document.getElementById('chatArea');
+
+    async function toggleTalk() {
+      if (isProcessing) return;
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        // 録音停止
+        mediaRecorder.stop();
+      } else {
+        // 録音開始
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            audioChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            stream.getTracks().forEach(track => track.stop());
+            await processConversation(audioBlob);
+          };
+
+          mediaRecorder.start();
+          talkBtn.classList.add('recording');
+          talkBtn.textContent = '⏹️';
+          status.textContent = '話してください...';
+        } catch (err) {
+          status.textContent = `マイクエラー: ${err.message}`;
+        }
+      }
+    }
+
+    async function processConversation(audioBlob) {
+      isProcessing = true;
+      talkBtn.classList.remove('recording');
+      talkBtn.classList.add('processing');
+      talkBtn.textContent = '⏳';
+
+      const totalStart = Date.now();
+      let sttTime = 0;
+      let llmTime = 0;
+
+      try {
+        // Step 1: 音声認識
+        status.textContent = '音声を認識中...';
+        const sttStart = Date.now();
+
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const sttRes = await fetch('/api/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+        const sttData = await sttRes.json();
+        sttTime = (Date.now() - sttStart) / 1000;
+
+        if (sttData.error) {
+          throw new Error(sttData.error);
+        }
+
+        // ユーザーメッセージ表示
+        addMessage('user', sttData.text);
+
+        // Step 2: LLM応答
+        status.textContent = '孫っちが考え中...';
+        const llmStart = Date.now();
+
+        const llmRes = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: sttData.text, stream: false })
+        });
+        const llmData = await llmRes.json();
+        llmTime = (Date.now() - llmStart) / 1000;
+
+        if (llmData.error) {
+          throw new Error(llmData.error);
+        }
+
+        // アシスタントメッセージ表示
+        addMessage('assistant', llmData.text);
+
+        // Step 3: 音声合成
+        status.textContent = '音声を生成中...';
+        const ttsType = document.querySelector('input[name="tts"]:checked').value;
+
+        if (ttsType === 'browser') {
+          // ブラウザTTS
+          const utterance = new SpeechSynthesisUtterance(llmData.text);
+          utterance.lang = 'ja-JP';
+          utterance.rate = 0.9;
+
+          utterance.onend = () => {
+            finishProcessing(totalStart, sttTime, llmTime);
+          };
+
+          window.speechSynthesis.speak(utterance);
+        } else {
+          // ElevenLabs
+          try {
+            const ttsRes = await fetch('/api/synthesize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: llmData.text })
+            });
+
+            if (!ttsRes.ok) {
+              const errData = await ttsRes.json();
+              throw new Error(errData.error);
+            }
+
+            const audioBuffer = await ttsRes.arrayBuffer();
+            const audio = new Audio(URL.createObjectURL(new Blob([audioBuffer], { type: 'audio/mpeg' })));
+
+            audio.onended = () => {
+              finishProcessing(totalStart, sttTime, llmTime);
+            };
+
+            audio.play();
+          } catch (ttsErr) {
+            // ElevenLabsエラー時はブラウザTTSにフォールバック
+            console.error('ElevenLabs error, falling back to browser TTS:', ttsErr);
+            const utterance = new SpeechSynthesisUtterance(llmData.text);
+            utterance.lang = 'ja-JP';
+            utterance.rate = 0.9;
+            utterance.onend = () => {
+              finishProcessing(totalStart, sttTime, llmTime);
+            };
+            window.speechSynthesis.speak(utterance);
+          }
+        }
+
+      } catch (err) {
+        status.textContent = `エラー: ${err.message}`;
+        resetButton();
+      }
+    }
+
+    function finishProcessing(totalStart, sttTime, llmTime) {
+      const totalTime = (Date.now() - totalStart) / 1000;
+
+      document.getElementById('sttTime').textContent = `${sttTime.toFixed(1)}秒`;
+      document.getElementById('llmTime').textContent = `${llmTime.toFixed(1)}秒`;
+      document.getElementById('totalTime').textContent = `${totalTime.toFixed(1)}秒`;
+
+      status.textContent = 'タップして話す';
+      resetButton();
+    }
+
+    function resetButton() {
+      isProcessing = false;
+      talkBtn.classList.remove('processing');
+      talkBtn.textContent = '🎤';
+    }
+
+    function addMessage(role, content) {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${role}`;
+      messageEl.innerHTML = `
+        <div class="message-label">${role === 'user' ? 'あなた' : '孫っち'}</div>
+        <div class="message-bubble">${content}</div>
+      `;
+      chatArea.appendChild(messageEl);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+  </script>
+</body>
+</html>

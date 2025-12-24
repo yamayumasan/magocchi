@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PoC-1: 音声入出力 - 孫っち</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .section {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #eee;
+    }
+    .section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #666;
+    }
+    .btn {
+      font-size: 18px;
+      padding: 16px 32px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 200px;
+    }
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #43A047;
+    }
+    .btn-primary:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-recording {
+      background: #f44336 !important;
+      animation: pulse 1s infinite;
+    }
+    .btn-secondary {
+      background: #2196F3;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background: #1976D2;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .result {
+      margin-top: 16px;
+      padding: 16px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      font-size: 16px;
+      line-height: 1.6;
+      min-height: 60px;
+      white-space: pre-wrap;
+    }
+    .result.error {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .result.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .status {
+      font-size: 14px;
+      color: #888;
+      margin-top: 8px;
+    }
+    audio {
+      width: 100%;
+      margin-top: 16px;
+    }
+    .nav {
+      margin-bottom: 20px;
+    }
+    .nav a {
+      margin: 0 10px;
+      color: #1976D2;
+      text-decoration: none;
+    }
+    .nav a:hover {
+      text-decoration: underline;
+    }
+    .input-group {
+      margin-bottom: 16px;
+    }
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #555;
+    }
+    .input-group input,
+    .input-group textarea {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .metric {
+      background: #f0f0f0;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+    .metric-label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>PoC-1: 音声入出力の基本動作</h1>
+  <p class="subtitle">Whisper API (STT) + ElevenLabs/ブラウザTTS</p>
+
+  <nav class="nav">
+    <a href="/">← ホーム</a>
+    <a href="/poc-2.html">PoC-2: LLM →</a>
+  </nav>
+
+  <div class="container">
+    <!-- STT: 音声入力 -->
+    <div class="section">
+      <h2>1. 音声入力 (Speech-to-Text)</h2>
+      <p style="margin-bottom: 16px; color: #666;">マイクで録音した音声をWhisper APIでテキスト化します。</p>
+
+      <button id="recordBtn" class="btn btn-primary" onclick="toggleRecording()">
+        🎤 録音開始
+      </button>
+
+      <div class="status" id="recordStatus">待機中</div>
+
+      <div id="sttResult" class="result" style="display:none;"></div>
+
+      <div class="metrics" id="sttMetrics" style="display:none;">
+        <div class="metric">
+          <div class="metric-value" id="sttTime">-</div>
+          <div class="metric-label">認識時間</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="audioLength">-</div>
+          <div class="metric-label">音声長さ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TTS: 音声出力 -->
+    <div class="section">
+      <h2>2. 音声出力 (Text-to-Speech)</h2>
+      <p style="margin-bottom: 16px; color: #666;">テキストを音声に変換します。</p>
+
+      <div class="input-group">
+        <label for="ttsText">読み上げるテキスト:</label>
+        <textarea id="ttsText" rows="3" placeholder="こんにちは、孫っちです。今日もお元気ですか？">こんにちは、孫っちです。今日もお元気ですか？</textarea>
+      </div>
+
+      <button class="btn btn-secondary" onclick="synthesizeSpeech('browser')">
+        🔊 ブラウザTTSで再生
+      </button>
+
+      <button class="btn btn-secondary" onclick="synthesizeSpeech('elevenlabs')" style="margin-top: 8px;">
+        🔊 ElevenLabsで再生
+      </button>
+
+      <div id="ttsResult" class="result" style="display:none;"></div>
+      <audio id="ttsAudio" controls style="display:none;"></audio>
+
+      <div class="metrics" id="ttsMetrics" style="display:none;">
+        <div class="metric">
+          <div class="metric-value" id="ttsTime">-</div>
+          <div class="metric-label">合成時間</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingStartTime = null;
+
+    // 録音の開始/停止
+    async function toggleRecording() {
+      const btn = document.getElementById('recordBtn');
+      const status = document.getElementById('recordStatus');
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        // 録音停止
+        mediaRecorder.stop();
+        btn.textContent = '🎤 録音開始';
+        btn.classList.remove('btn-recording');
+        status.textContent = '処理中...';
+      } else {
+        // 録音開始
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            audioChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const recordingDuration = (Date.now() - recordingStartTime) / 1000;
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            stream.getTracks().forEach(track => track.stop());
+            await transcribeAudio(audioBlob, recordingDuration);
+          };
+
+          recordingStartTime = Date.now();
+          mediaRecorder.start();
+          btn.textContent = '⏹️ 録音停止';
+          btn.classList.add('btn-recording');
+          status.textContent = '録音中...';
+        } catch (err) {
+          status.textContent = `エラー: ${err.message}`;
+          console.error(err);
+        }
+      }
+    }
+
+    // Whisper APIでテキスト化
+    async function transcribeAudio(audioBlob, duration) {
+      const status = document.getElementById('recordStatus');
+      const result = document.getElementById('sttResult');
+      const metrics = document.getElementById('sttMetrics');
+
+      result.style.display = 'block';
+      result.className = 'result';
+      result.textContent = 'Whisper APIで認識中...';
+
+      const startTime = Date.now();
+
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const res = await fetch('/api/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+        if (data.error) {
+          result.className = 'result error';
+          result.textContent = `エラー: ${data.error}`;
+        } else {
+          result.className = 'result success';
+          result.textContent = `認識結果:\n${data.text}`;
+
+          // メトリクス表示
+          metrics.style.display = 'grid';
+          document.getElementById('sttTime').textContent = `${elapsed}秒`;
+          document.getElementById('audioLength').textContent = `${duration.toFixed(1)}秒`;
+        }
+
+        status.textContent = '完了';
+      } catch (err) {
+        result.className = 'result error';
+        result.textContent = `エラー: ${err.message}`;
+        status.textContent = 'エラー';
+      }
+    }
+
+    // TTS音声合成
+    async function synthesizeSpeech(type) {
+      const text = document.getElementById('ttsText').value;
+      const result = document.getElementById('ttsResult');
+      const audio = document.getElementById('ttsAudio');
+      const metrics = document.getElementById('ttsMetrics');
+
+      if (!text) {
+        result.style.display = 'block';
+        result.className = 'result error';
+        result.textContent = 'テキストを入力してください';
+        return;
+      }
+
+      result.style.display = 'block';
+      result.className = 'result';
+      result.textContent = `${type === 'browser' ? 'ブラウザ' : 'ElevenLabs'}で音声合成中...`;
+
+      const startTime = Date.now();
+
+      if (type === 'browser') {
+        // ブラウザのSpeech Synthesis API
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ja-JP';
+        utterance.rate = 0.9;
+
+        utterance.onend = () => {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+          result.className = 'result success';
+          result.textContent = '✅ 再生完了（ブラウザTTS）';
+          metrics.style.display = 'grid';
+          document.getElementById('ttsTime').textContent = `${elapsed}秒`;
+        };
+
+        utterance.onerror = (e) => {
+          result.className = 'result error';
+          result.textContent = `エラー: ${e.error}`;
+        };
+
+        window.speechSynthesis.speak(utterance);
+        audio.style.display = 'none';
+      } else {
+        // ElevenLabs API
+        try {
+          const res = await fetch('/api/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'TTS failed');
+          }
+
+          const audioBlob = await res.blob();
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+          audio.src = audioUrl;
+          audio.style.display = 'block';
+          audio.play();
+
+          result.className = 'result success';
+          result.textContent = '✅ 音声生成完了（ElevenLabs）';
+          metrics.style.display = 'grid';
+          document.getElementById('ttsTime').textContent = `${elapsed}秒`;
+        } catch (err) {
+          result.className = 'result error';
+          result.textContent = `エラー: ${err.message}`;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
